@@ -9,14 +9,6 @@ import (
 
 const (
 	STATUS_CLIENT = iota
-	LB_CLIENT
-	LOGIN_CLIENT
-	MESSAGE_CLIENT
-	RELATION_CLIENT
-	GROUP_CLIENT
-	USER_CLIENT
-	MOGU_APP_CLIENT
-	TT_APP_CLIENT
 	CLIENT_TYPE_NUM
 )
 
@@ -24,22 +16,6 @@ func GetClientTypeByName(name string) (int32, error) {
 	switch  {
 	case name == "status_client":
 		return STATUS_CLIENT, nil
-	case name == "lb_client":
-		return LB_CLIENT, nil
-	case name == "login_client":
-		return LOGIN_CLIENT, nil
-	case name == "message_client":
-		return MESSAGE_CLIENT, nil
-	case name == "relation_client":
-		return RELATION_CLIENT, nil
-	case name == "group_client":
-		return GROUP_CLIENT, nil
-	case name == "user_client":
-		return USER_CLIENT, nil
-	case name == "mogu_app_client":
-		return MOGU_APP_CLIENT, nil
-	case name == "tt_app_client":
-		return TT_APP_CLIENT, nil
 	default:
 		return  CLIENT_TYPE_NUM, errors.New("can not find Client name: " + name)
 	}
@@ -48,22 +24,6 @@ func GetClientTypeByName(name string) (int32, error) {
 func CheckNameValid(name string) bool {
 	switch {
 	case name == "status_client":
-		return true
-	case name == "lb_client":
-		return true
-	case name == "login_client":
-		return true
-	case name == "message_client":
-		return true
-	case name == "relation_client":
-		return true
-	case name == "group_client":
-		return true
-	case name == "user_client":
-		return true
-	case name == "tt_app_client":
-		return true
-	case name == "mogu_app_client":
 		return true
 	default:
 		return false

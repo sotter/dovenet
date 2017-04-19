@@ -14,6 +14,7 @@
       <root url="file://$PROJECT_DIR$/../../../web-site" />
       <root url="file://$PROJECT_DIR$/../../../joy4" />
       <root url="file://$PROJECT_DIR$/../../../waf-proxy" />
+      <root url="file://$PROJECT_DIR$/../../../sync-files" />
     </CLASSES>
     <LIBRARY_FILE />
     <SOURCES>
@@ -30,6 +31,7 @@
       <root url="file://$PROJECT_DIR$/../../../web-site" />
       <root url="file://$PROJECT_DIR$/../../../joy4" />
       <root url="file://$PROJECT_DIR$/../../../waf-proxy" />
+      <root url="file://$PROJECT_DIR$/../../../sync-files" />
     </SOURCES>
     <excluded>
       <root url="file://$PROJECT_DIR$" />
