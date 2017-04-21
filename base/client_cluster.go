@@ -7,29 +7,6 @@ import (
 	log "github.com/sotter/dovenet/log"
 )
 
-const (
-	STATUS_CLIENT = iota
-	CLIENT_TYPE_NUM
-)
-
-func GetClientTypeByName(name string) (int32, error) {
-	switch  {
-	case name == "status_client":
-		return STATUS_CLIENT, nil
-	default:
-		return  CLIENT_TYPE_NUM, errors.New("can not find Client name: " + name)
-	}
-}
-
-func CheckNameValid(name string) bool {
-	switch {
-	case name == "status_client":
-		return true
-	default:
-		return false
-	}
-}
-
 //针对某一个类型Server的连接地址，转发的时候方便
 type ServerConnGroup struct {
 	stop        chan bool
@@ -40,65 +17,101 @@ type ServerConnGroup struct {
 //TCP Client管理的总入口，所有的客户端可以用一个全局的TransPortClient来管理
 type TransPortClient struct {
 	stop        chan bool
-	connGroups  [CLIENT_TYPE_NUM]ServerConnGroup  // 连接池管理， key：连接的Name，eg: lb_client
+	connGroups  []*ServerConnGroup  // 连接池管理， key：连接的Name，eg: lb_client
+	connsIndex	map[string]int
 	once        *sync.Once
 	lock        sync.RWMutex
+}
+
+func NewServerConnGroup(name string) *ServerConnGroup {
+	return &ServerConnGroup {
+		stop : make(chan bool),
+		name : name,
+		Manager: NewManager(),
+	}
 }
 
 func NewTransPortClient() *TransPortClient {
 	tps := &TransPortClient{
 		stop : make(chan bool, 1),
+		connsIndex : make(map[string]int),
 		once : &sync.Once{},
-	}
-
-	for i := 0; i < CLIENT_TYPE_NUM; i++ {
-		tps.connGroups[i].Manager = NewManager()
 	}
 
 	return tps
 }
 
 //在外部创建TcpConnection
-func (this *TransPortClient)RegisterConnServer(tcpConn *TcpConnection) (err error){
+func (this *TransPortClient)RegisterConnServer(tcpConn *TcpConnection) (err error) {
 	defer RecoverPrint()
-	if client_type, err := GetClientTypeByName(tcpConn.Name); err == nil {
-		//log.Debug("======== this *TransPortClient)RegisterConnServer client type ", client_type)
-		this.connGroups[client_type].Manager.PutSession(tcpConn)
-		tcpConn.ConnManager = this.connGroups[client_type].Manager
+
+	//如果没有这个Manager，那么注册下这个manager
+	this.RegisterConnGroup(tcpConn.Name)
+
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	index, exist:= this.connsIndex[tcpConn.Name]
+	if exist {
+		this.connGroups[index].Manager.PutSession(tcpConn)
+		tcpConn.ConnManager = this.connGroups[index].Manager
+	} else {
+		log.Println("Server Name ", tcpConn.Name, " can not find")
+		return errors.New("Can find Server Name")
 	}
 
 	return err
 }
 
+
 //根据连接客户端的Name和连接id获取到TcpConnection
 func (this *TransPortClient)GetTcpConnection(name string, connid uint64)  *TcpConnection {
-	client_type, err := GetClientTypeByName(name)
-	if err != nil {
-		log.Println("GetTcpConnection :", err.Error())
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+
+	index, exist := this.connsIndex[name]
+	if exist == false {
 		return nil
 	}
-
-	return this.connGroups[client_type].Manager.GetSession(connid)
+	return this.connGroups[index].Manager.GetSession(connid)
 }
 
-func (this *TransPortClient)RemoveByAddress(name string, address string) {
-	client_type, err := GetClientTypeByName(name)
-	if err != nil {
-		log.Println("RemoveByAddress :", err.Error())
+//注册一个新的ClientName
+func (this *TransPortClient)RegisterConnGroup(name string) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	_, exist := this.connsIndex[name]
+	if exist {
 		return
 	}
 
-	conns := this.connGroups[client_type].Manager.GetSessionByAddress(address)
+	cg := NewServerConnGroup(name)
+	this.connGroups = append(this.connGroups, cg)
+	this.connsIndex[name] =  len(this.connGroups) - 1
+}
 
-	for _, conn := range conns {
-		conn.Reconnect = false
-		conn.Close()
+func (this *TransPortClient)RemoveByAddress(name string, address string) {
+	this.lock.Lock()
+	index, exist := this.connsIndex[name]
+	if exist == false {
+		log.Println("RemoveByAddress :", name, " is not exist!")
+		this.lock.Unlock()
+		return
+	} else {
+		conns := this.connGroups[index].Manager.GetSessionByAddress(address)
+		delete(this.connsIndex, name)
+		this.lock.Unlock()
+
+		for _, conn := range conns {
+			conn.Reconnect = false
+			conn.Close()
+		}
 	}
 }
 
 //一层一层的往下关闭
 func (this *TransPortClient)Stop() {
-	for i := 0; i < CLIENT_TYPE_NUM; i++ {
+	n := len(this.connGroups)
+	for i := 0; i < n; i++ {
 		this.connGroups[i].Manager.Dispose()
 	}
 }
@@ -106,37 +119,32 @@ func (this *TransPortClient)Stop() {
 func (this *TransPortClient)SendData(name string, msg protocol.Message) error {
 	defer RecoverPrint()
 
-	index, err := GetClientTypeByName(name)
-	if err != nil {
-		log.Println(err.Error())
-		return err
+	this.lock.RLock()
+	var tcpConn *TcpConnection = nil
+	index, exist := this.connsIndex[name]
+	if exist {
+		tcpConn = this.connGroups[index].Manager.GetRotationSession()
 	}
+	this.lock.RUnlock()
 
-	if index >= CLIENT_TYPE_NUM {
-		return errors.New("can not find client name!!")
+	if tcpConn != nil {
+		return tcpConn.Write(msg)
+	} else {
+		return errors.New("No Tcpconnecion can use.")
 	}
-	tcpConn := this.connGroups[index].Manager.GetRotationSession()
-	if tcpConn == nil {
-		return errors.New("Can not get connection!!")
-	}
-
-	return tcpConn.Write(msg)
 }
 
 func (this *TransPortClient)BroadCast(name string, msg protocol.Message) error {
 	defer RecoverPrint()
-	index, err := GetClientTypeByName(name)
-	if err != nil {
-		return err
-	}
 
-	if index >= CLIENT_TYPE_NUM {
-		return errors.New("can not find client name!!")
+	this.lock.RLock()
+	index, exist := this.connsIndex[name]
+	if exist {
+		this.connGroups[index].Manager.BroadcastRun(func(conn *TcpConnection){
+			conn.Write(msg)
+		})
 	}
-
-	this.connGroups[index].Manager.BroadcastRun(func(conn *TcpConnection){
-		conn.Write(msg)
-	})
+	this.lock.RUnlock()
 
 	return nil
 }

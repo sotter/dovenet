@@ -30,13 +30,6 @@ func NewServiceClient(size uint32) *ServiceClient {
 }
 
 func (this *ServiceClient) RegisterClient(name string, address string) {
-
-	//0. Error Check, 只有固定的name才是合法的
-	if base.CheckNameValid(name) == false {
-		log.Print("name:", name, " is invalid")
-		return
-	}
-
 	//1.  建立网络连接net.TcpConn
 	dest, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
@@ -111,7 +104,7 @@ func (this *ServiceClient) DoHeartBeatLoop(name string, connId uint64) {
 
 func main() {
 	test_client := NewServiceClient(1024)
-	test_client.RegisterClient("status_client", "127.0.0.1:8000")
+	test_client.RegisterClient("ctl_client", "127.0.0.1:8000")
 
 	select {
 
