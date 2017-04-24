@@ -86,6 +86,12 @@ func (this *CommCodec) Read() (msg Message, e error)  {
 		var msg CommMsg
 		msg.Header.Decode(head)
 
+		//如果msg_type == 0是心跳包，直接原路返回
+		if msg.Header.MsgType == uint16(0) {
+			this.Write(&msg)
+			return nil, nil
+		}
+
 		pdubuf := make([]byte, msg.Header.Length)
 		_, err = io.ReadFull(this.TcpConn, pdubuf)
 
@@ -109,6 +115,19 @@ func (this *CommCodec)Write(msg Message) (n int, err error) {
 
 func (this *CommCodec)WriteBinary(msg []byte) (n int, err error) {
 	return this.TcpConn.Write(msg)
+}
+
+//发送心跳包 DoHeartBeat
+func (this *CommCodec)DoHeartBeat() error {
+	ht := &CommMsg {
+		Header : CommSplitHeader {
+			MagicNumber : GMagicNumber,
+			MsgType  : uint16(0),
+			Length   : uint32(0),
+		},
+	}
+	_, err := this.Write(ht)
+	return err
 }
 
 func (this *CommCodec)Close() error {

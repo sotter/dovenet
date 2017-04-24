@@ -13,6 +13,7 @@ type Conn interface {
 	Write(msg Message) (n int, err error)
 	WriteBinary(msg []byte) (n int, err error)
 	Close() error
+	DoHeartBeat() error
 }
 
 type Protocol interface {

@@ -133,7 +133,19 @@ func (this *Manager) GetRandomSession() *TcpConnection {
 
 //TODO 暂时先不实现
 func (this *Manager) GetHashSession(hashCode uint64) *TcpConnection {
-	return nil
+	var all_conns []*TcpConnection
+
+	this.BroadcastRun(func (conn *TcpConnection){
+		all_conns = append(all_conns, conn)
+	})
+
+	if len(all_conns) == 0 {
+		return nil
+	}
+
+	index := (hashCode) % uint64(len(all_conns))
+
+	return all_conns[index]
 }
 
 //全局Connection共同执行一个函数

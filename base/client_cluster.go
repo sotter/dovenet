@@ -134,6 +134,24 @@ func (this *TransPortClient)SendData(name string, msg protocol.Message) error {
 	}
 }
 
+func (this *TransPortClient)SendDataWouldBlock(name string, msg protocol.Message, hashCode uint64) error {
+	defer RecoverPrint()
+
+	this.lock.RLock()
+	var tcpConn *TcpConnection = nil
+	index, exist := this.connsIndex[name]
+	if exist {
+		tcpConn = this.connGroups[index].Manager.GetHashSession(hashCode)
+	}
+	this.lock.RUnlock()
+
+	if tcpConn != nil {
+		return tcpConn.WriteWouldBlock(msg)
+	} else {
+		return errors.New("No Tcpconnecion can use.")
+	}
+}
+
 func (this *TransPortClient)BroadCast(name string, msg protocol.Message) error {
 	defer RecoverPrint()
 

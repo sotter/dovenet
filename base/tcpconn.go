@@ -155,6 +155,10 @@ func (this *TcpConnection)Stop() bool {
 	return true
 }
 
+func (this *TcpConnection) DoHeartBeat() error {
+	return this.conn.DoHeartBeat()
+}
+
 func (this *TcpConnection)Write(msg protocol.Message) (err error) {
 	select {
 	case this.messageSendChan <- msg:
@@ -162,6 +166,14 @@ func (this *TcpConnection)Write(msg protocol.Message) (err error) {
 	default:
 		//calc.Add("Lost Packet")
 		log.Println("messageSendChan is full , Write Lost packet !!!")
+		return nil
+	}
+}
+
+//TODO : 目前先改成，如果已经发送不出去了，直接把调用者阻塞堵住, 以应对可靠性要求高和具有流控功能的业务
+func (this *TcpConnection)WriteWouldBlock(msg protocol.Message) (err error) {
+	select {
+	case this.messageSendChan <- msg:
 		return nil
 	}
 }
