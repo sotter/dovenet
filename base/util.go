@@ -115,9 +115,10 @@ func printStack() {
 
 func FormatOutput(field1 string, field2 string, total_len int) string {
 	//中间至少保留 3个"-"的占位符
-	output := make([]byte, total_len)
 	len1 := len(field1)
 	len2 := len(field2)
+	total_len = total_len + len2
+	output := make([]byte, total_len)
 
 	if len1 > 30 {
 		field1 = field1[:30]
@@ -126,9 +127,6 @@ func FormatOutput(field1 string, field2 string, total_len int) string {
 	if len2 > 30 {
 		field2 = field2[:30]
 		len2 = 30
-
-
-
 	}
 
 	j := 0

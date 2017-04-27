@@ -175,6 +175,9 @@ func (this *TcpConnection)WriteWouldBlock(msg protocol.Message) (err error) {
 	select {
 	case this.messageSendChan <- msg:
 		return nil
+	case <-this.closeConnChan:
+		log.Println("WriteWouldBlock -> To Close ", this.String())
+		return nil
 	}
 }
 
@@ -191,7 +194,12 @@ func (this *TcpConnection) Read() (err error) {
 		return err
 	}
 
-	this.messageHandlerChan <- msg
+	select {
+	case this.messageHandlerChan <- msg :
+		return nil
+	case <-this.closeConnChan:
+		return nil
+	}
 
 	return nil
 }
